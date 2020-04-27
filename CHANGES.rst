@@ -1,6 +1,8 @@
 0.3.1 (unreleased)
 ==================
 
+- New ``filter_parameterization`` subpackage to handle filter parameterization,
+  adapted from ``tynt`` package written by Brett Morris. [#257]
 
 0.3.0 (2020-03-17)
 ==================
