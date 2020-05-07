@@ -48,13 +48,13 @@ class TestSVOFilters:
          ('Generic/Johnson.I', 8780.7 * u.AA, 2316 * u.AA)])
     def test_lambda_eff_w_eff(self, filtername, lambda_mean_true, w_eff_true):
         inputs = self.inputs_from_table(filtername)
-        bp = filter_from_fft(*inputs)
+        bp = filter_from_fft(*inputs, taper=False)
         assert_quantity_allclose(bp.avgwave(), lambda_mean_true, rtol=0.03)
         assert_quantity_allclose(bp.rectwidth(), w_eff_true, rtol=0.1)
 
     def test_astropy_model(self):
         inputs = self.inputs_from_table('SLOAN/SDSS.r')
-        bp = filter_from_fft(*inputs)
+        bp = filter_from_fft(*inputs, taper=False)
         m = analytical_model_from_fft(*inputs)
         wave = bp.waveset
         assert_quantity_allclose(bp(wave), m(wave))

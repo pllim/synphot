@@ -39,24 +39,24 @@ By default, 10 FFT parameters are returned as complex numbers::
     >>> bp = SpectralElement.from_file(filename)
     >>> n_lambda, lambda_0, delta_lambda, tr_max, fft_pars = filter_to_fft(bp)
     >>> n_lambda  # Number of elements in wavelengths
-    10000
+    2831
     >>> lambda_0  # Starting value of wavelengths  # doctest: +FLOAT_CMP
-    <Quantity 3479.999 Angstrom>
+    <Quantity 4562.3774 Angstrom>
     >>> delta_lambda  # Median wavelength separation  # doctest: +FLOAT_CMP
-    <Quantity 0.66748047 Angstrom>
+    <Quantity 0.5891113 Angstrom>
     >>> tr_max  # Peak value of throughput  # doctest: +FLOAT_CMP
     <Quantity 0.241445>
     >>> fft_pars  # FFT parameters  # doctest: +SKIP
-    [(407.5180314841658+7.494005416219807e-16j),
-     (-78.52240189503877-376.53990235136575j),
-     (-294.86589196496584+127.25464850352665j),
-     (130.20273803287864+190.84263652863257j),
-     (96.62299079012317-91.70087676328245j),
-     (-32.572468348727654-34.227696019221035j),
-     (-8.051741476066471-21.354793540998294j),
-     (-51.708676896903725+6.883836090870033j),
-     (13.08719675518801+54.48177212720124j),
-     (38.635087381362396-13.02803811279449j)]
+    [(461.5710329942621+0j),
+     (-148.6831797140449-26.00934067269394j),
+     (-63.48690428913448-3.710362982427311j),
+     (-22.824360392012693+10.230055530448702j),
+     (-7.614567273353362+0.7485954960457235j),
+     (1.8631797382016997-1.4813411232558236j),
+     (2.5283966747262396-3.587331809367062j),
+     (7.331817561439595-1.7043892755435297j),
+     (2.903230744026084-1.9715125229501185j),
+     (1.4886808341743099+3.4288910746989916j)]
 
 .. TODO: Only skipping the fft_pars comparison above because output is very
    different for NUMPY_LT_1_17. Unskip it and replace with +FLOAT_CMP when
@@ -75,13 +75,15 @@ will store the results in a table for you::
           filter      n_lambda ...                  fft_9
                                ...
           str17        int...  ...                complex128
-    ----------------- -------- ... ---------------------------------------
-    HST/ACS/HRC/F555W    10000 ... (38.635087381362396-13.02803811279449j)
+    ----------------- -------- ... ----------------------------------------
+    HST/ACS/HRC/F555W     2831 ... (1.4886808341743099+3.4288910746989916j)
     >>> filter_pars_table.write('my_filter_pars.fits')  # doctest: +SKIP
 
 .. TODO: Only skipping the filter_pars_table comparison above because output
    is slightly different for NUMPY_LT_1_17. Unskip it and replace with
    +FLOAT_CMP +ELLIPSIS when Numpy minversion is 1.17.
+
+.. NOTE: n_lambda is int32 on Windows but int64 on NIX.
 
 .. _filter_fft_construction:
 
@@ -97,9 +99,10 @@ Following from the example above::
     >>> reconstructed_bp = filter_from_fft(
     ...     n_lambda, lambda_0, delta_lambda, tr_max, fft_pars)
 
-For this particular example using HST ACS/HRC F555W filter, perhaps 10
-parameters are not quite sufficient. Therefore, caution needs to be exercised
-if you opt to parameterize your filters using this method.
+For this particular example using HST ACS/HRC F555W filter, the
+approximation is pretty close though it did not perfectly
+reconstruct the original shape. Whether this is sufficient or not
+depends on your individual needs.
 
 .. plot::
 
@@ -117,7 +120,7 @@ if you opt to parameterize your filters using this method.
     w = bp.waveset
     plt.plot(w, bp(w), 'b-', label='Original')
     plt.plot(w, reconstructed_bp(w), 'r--', label='Reconstructed')
-    plt.xlim(3500, 8000)
+    plt.xlim(4250, 7000)
     plt.xlabel('Wavelength (Angstrom)')
     plt.ylabel('Throughput')
     plt.title('HST ACS/HRC F555W')

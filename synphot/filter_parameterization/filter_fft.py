@@ -29,7 +29,7 @@ def _simplified_wavelength(n_lambda, lambda_0, delta_lambda):
                      delta_lambda.value) * wave_unit
 
 
-def filter_to_fft(bp, wavelengths=None, n_terms=10):
+def filter_to_fft(bp, wavelengths=None, n_terms=10, threshold=0.001):
     """Calculate filter parameters using FFT.
 
     Parameters
@@ -44,6 +44,10 @@ def filter_to_fft(bp, wavelengths=None, n_terms=10):
 
     n_terms : int
         Number of FFT parameters to keep.
+
+    threshold : float
+        Only filter region within this throughput threshold will
+        be considered for parameterization. Default is 0.1%.
 
     Returns
     -------
@@ -66,6 +70,11 @@ def filter_to_fft(bp, wavelengths=None, n_terms=10):
     wl = bp._validate_wavelengths(wavelengths)
     tr = bp(wl)
 
+    # Taper where throughput < 0.1% and only use part with real signal
+    good_wave = wl[tr >= threshold]
+    wl = wl[(wl >= min(good_wave)) & (wl <= max(good_wave))]
+    tr = bp(wl)
+
     diff_wl = np.diff(wl)
 
     delta_lambda = np.nanmedian(diff_wl[diff_wl != 0])
@@ -78,10 +87,10 @@ def filter_to_fft(bp, wavelengths=None, n_terms=10):
 
     tr_max = tr.max()
 
-    # Interpolate transmittance onto simplified wavelength grid
+    # Interpolate throughput onto simplified wavelength grid
     tr_interp = np.interp(simplified_wavelength, wl, tr)
 
-    # Take the DFT of the interpolated transmittance curve
+    # Take the DFT of the interpolated throughput curve
     fft = np.fft.fft(tr_interp)[:n_terms]
 
     if isinstance(fft, u.Quantity):
@@ -92,7 +101,8 @@ def filter_to_fft(bp, wavelengths=None, n_terms=10):
     return n_lambda, lambda_0, delta_lambda, tr_max, fft_parameters
 
 
-def filter_from_fft(n_lambda, lambda_0, delta_lambda, tr_max, fft_parameters):
+def filter_from_fft(n_lambda, lambda_0, delta_lambda, tr_max, fft_parameters,
+                    taper=True):
     """Reconstruct a filter from given FFT parameters.
     The inputs for this function can be obtained from :func:`filter_to_fft`.
 
@@ -110,12 +120,17 @@ def filter_from_fft(n_lambda, lambda_0, delta_lambda, tr_max, fft_parameters):
         If not a Quantity, assumed to be in Angstrom.
 
     tr_max : float or `~astropy.units.quantity.Quantity`
-        Maximum value of transmittance curve.
+        Maximum value of throughput curve.
         If a Quantity, must be unitless.
 
     fft_parameters : list of complex
         List of complex values that are FFT parameters representing the
-        filter transmittance curve.
+        filter throughput curve.
+
+    taper : bool
+        Taper the filter such that throughput is zero outside of
+        wavelength range reconstructed from ``n_lambda``,
+        ``lambda_0``, and ``delta_lambda``.
 
     Returns
     -------
@@ -126,9 +141,14 @@ def filter_from_fft(n_lambda, lambda_0, delta_lambda, tr_max, fft_parameters):
     wavelength = _simplified_wavelength(n_lambda, lambda_0, delta_lambda)
     n_wave = len(wavelength)
     ifft = np.fft.ifft(fft_parameters, n=n_wave)
-    transmittance = ((ifft.real - ifft.real.min()) * tr_max / ifft.real.ptp())  # noqa
-    return SpectralElement(
-        Empirical1D, points=wavelength, lookup_table=transmittance)
+    throughput = ((ifft.real - ifft.real.min()) * tr_max / ifft.real.ptp())  # noqa
+    bp = SpectralElement(
+        Empirical1D, points=wavelength, lookup_table=throughput)
+
+    if taper:
+        bp = bp.taper()
+
+    return bp
 
 
 def analytical_model_from_fft(n_lambda, lambda_0, delta_lambda, tr_max,
@@ -170,8 +190,8 @@ def analytical_model_from_fft(n_lambda, lambda_0, delta_lambda, tr_max,
 
         Returns
         -------
-        transmittance : array-like or `~astropy.units.quantity.Quantity`
-            Transmittance curve. If ``tr_max`` is a Quantity, this will
+        throughput : array-like or `~astropy.units.quantity.Quantity`
+            Throughput curve. If ``tr_max`` is a Quantity, this will
             be a Quantity as well.
 
         """
