@@ -1,11 +1,17 @@
+"""Test filter parameterization.
+
+Some tests are in ``docs/synphot/filter_par.rst`` as doctest.
+
+"""
 import pytest
 from astropy import units as u
 from astropy.table import Table
 from astropy.tests.helper import assert_quantity_allclose
 from astropy.utils.data import get_pkg_data_filename
 
+from synphot.spectrum import SpectralElement
 from synphot.filter_parameterization.filter_fft import (
-    filter_from_fft, analytical_model_from_fft)
+    filter_to_fft, filter_from_fft, analytical_model_from_fft)
 
 
 class TestSVOFilters:
@@ -58,3 +64,51 @@ class TestSVOFilters:
         m = analytical_model_from_fft(*inputs)
         wave = bp.waveset
         assert_quantity_allclose(bp(wave), m(wave))
+
+
+class TestRoundTrip:
+    def compare_filter(self, bp, **kwargs):
+        pars = filter_to_fft(bp)
+        recon_bp = filter_from_fft(*pars)
+        wave = bp.waveset
+
+        assert_quantity_allclose(recon_bp(wave), bp(wave), **kwargs)
+
+        # Check various photometric properties (1% agreement)
+        rtol = 0.01
+        area = 1 * (u.m * u.m)
+        assert_quantity_allclose(bp.avgwave(), recon_bp.avgwave(), rtol=rtol)
+        assert_quantity_allclose(bp.tlambda(), recon_bp.tlambda(), rtol=rtol)
+        assert_quantity_allclose(bp.tpeak(), recon_bp.tpeak(), rtol=rtol)
+        assert_quantity_allclose(
+            bp.efficiency(), recon_bp.efficiency(), rtol=rtol)
+        assert_quantity_allclose(
+            bp.equivwidth(), recon_bp.equivwidth(), rtol=rtol)
+        assert_quantity_allclose(
+            bp.integrate(), recon_bp.integrate(), rtol=rtol)
+        assert_quantity_allclose(
+            bp.rectwidth(), recon_bp.rectwidth(), rtol=rtol)
+        assert_quantity_allclose(bp.rmswidth(), recon_bp.rmswidth(), rtol=rtol)
+        assert_quantity_allclose(bp.photbw(), recon_bp.photbw(), rtol=rtol)
+        assert_quantity_allclose(bp.fwhm(), recon_bp.fwhm(), rtol=rtol)
+        assert_quantity_allclose(bp.barlam(), recon_bp.barlam(), rtol=rtol)
+        assert_quantity_allclose(
+            bp.unit_response(area), recon_bp.unit_response(area), rtol=rtol)
+        assert_quantity_allclose(
+            bp.emflx(area), recon_bp.emflx(area), rtol=rtol)
+        assert_quantity_allclose(bp.pivot(), recon_bp.pivot(), rtol=rtol)
+
+        # NOTE: Too fragile of a check when filter has a plateau.
+        # assert_quantity_allclose(bp.wpeak(), recon_bp.wpeak(), rtol=rtol)
+
+    # NOTE: If HST adopts parameterized filters, a remote-data version of
+    #       this test can be used to run for relevant filters.
+    def test_roundtrip_hst_acs_hrc_f555(self):
+        filename = get_pkg_data_filename(
+            'data/hst_acs_hrc_f555w.fits', package='synphot.tests')
+        bp = SpectralElement.from_file(filename)
+
+        # Where throughout is non-zero:
+        # Max absolute difference: 0.00672278
+        # Max relative difference: 2.02788247
+        self.compare_filter(bp, atol=0.007)

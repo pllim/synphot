@@ -93,9 +93,9 @@ def filter_to_fft(bp, wavelengths=None, n_terms=10, threshold=0.001):
     # Take the DFT of the interpolated throughput curve
     fft = np.fft.fft(tr_interp)[:n_terms]
 
-    if isinstance(fft, u.Quantity):
+    if not NUMPY_LT_1_17:
         fft_parameters = fft.value.tolist()
-    else:  # Older Numpy does not return Quantity
+    else:  # Numpy 1.16 does not return Quantity
         fft_parameters = fft.tolist()
 
     return n_lambda, lambda_0, delta_lambda, tr_max, fft_parameters
